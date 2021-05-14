@@ -152,6 +152,11 @@ ORANGE_COLOUR = numpy.array([217, 95, 2], dtype=float) / 255
 PURPLE_COLOUR = numpy.array([117, 112, 179], dtype=float) / 255
 GREY_COLOUR = numpy.full(3, 152. / 255)
 
+HISTOGRAM_EDGE_WIDTH = 1.5
+HISTOGRAM_FACE_COLOUR = numpy.full(3, 152. / 255)
+HISTOGRAM_FACE_COLOUR = matplotlib.colors.to_rgba(HISTOGRAM_FACE_COLOUR, 0.5)
+HISTOGRAM_EDGE_COLOUR = numpy.full(3, 152. / 255)
+
 FONT_SIZE = 20
 pyplot.rc('font', size=FONT_SIZE)
 pyplot.rc('axes', titlesize=FONT_SIZE)
@@ -3172,3 +3177,144 @@ def plot_j_measures(j_measures, predictor_names):
             horizontalalignment='left', verticalalignment='center',
             fontsize=BAR_GRAPH_FONT_SIZE
         )
+
+
+def _get_trial_values_for_pdp(predictor_values, num_trial_values):
+    """Returns trial values for partial-dependence plot (PDP).
+
+    E = number of examples
+    T = number of trial values
+
+    :param predictor_values: length-E numpy array of predictor values in
+        dataset.
+    :param num_trial_values: Number of trial values to return.
+    :return: trial_values: length-T numpy array of trial values.
+    """
+
+    num_trial_values = int(numpy.round(num_trial_values))
+    percentile_levels = numpy.linspace(
+        0, 100, num=num_trial_values, dtype=float
+    )
+
+    return numpy.percentile(predictor_values, percentile_levels)
+
+
+def make_pdp_inputs(
+        neural_net_object, predictor_table_norm, predictor_table_denorm,
+        normalization_dict, trial_predictor_name, num_trial_values):
+    """Makes inputs for partial-dependence plot (PDP).
+
+    T = number of trial values
+
+    :param neural_net_object: Trained neural net (instance of
+        `keras.models.Model` or `keras.models.Sequential`).
+    :param predictor_table_norm: pandas DataFrame with normalized predictor
+        values.  Each row is one storm object.
+    :param predictor_table_denorm: Same but with denormalized predictors.
+    :param normalization_dict: See doc for `normalize_predictors`.
+    :param trial_predictor_name: Name of trial predictor.
+    :param num_trial_values: Number of trial values.
+    :return: trial_values_denorm: length-T numpy array of denormalized trial
+        values.
+    :return: mean_probabilities: length-T numpy array of mean forecast
+        probabilities.
+    :return: frequencies: length-T numpy array of frequencies, indicating how
+        often each value occurs in the dataset.
+    """
+
+    # TODO(thunderhoser): Make this method work for models other than a neural
+    # net.  It would be an easy fix.
+
+    trial_values_denorm = _get_trial_values_for_pdp(
+        predictor_values=predictor_table_denorm[trial_predictor_name].values,
+        num_trial_values=num_trial_values
+    )
+    trial_predictor_table_denorm = pandas.DataFrame.from_dict({
+        trial_predictor_name: trial_values_denorm
+    })
+    trial_predictor_table_norm, _ = normalize_predictors(
+        predictor_table=trial_predictor_table_denorm,
+        normalization_dict=normalization_dict
+    )
+
+    mean_probabilities = numpy.full(num_trial_values, numpy.nan)
+    frequencies = numpy.full(num_trial_values, numpy.nan)
+
+    for i in range(num_trial_values):
+        this_predictor_table_norm = copy.deepcopy(predictor_table_norm)
+        this_predictor_table_norm[trial_predictor_name].values[:] = (
+            trial_predictor_table_norm[trial_predictor_name].values[i]
+        )
+
+        print('Applying neural net to data with {0:s} = {1:.2g}...'.format(
+            trial_predictor_name, trial_values_denorm[i]
+        ))
+        these_probs = apply_neural_net(
+            model_object=neural_net_object,
+            predictor_matrix=this_predictor_table_norm.to_numpy(),
+            num_examples_per_batch=1024, verbose=False
+        )
+        mean_probabilities[i] = numpy.mean(these_probs)
+
+        if i == 0:
+            lower_bin_edge = -numpy.inf
+        else:
+            lower_bin_edge = numpy.mean([
+                trial_values_denorm[i - 1], trial_values_denorm[i]
+            ])
+
+        if i == num_trial_values - 1:
+            upper_bin_edge = numpy.inf
+        else:
+            upper_bin_edge = numpy.mean([
+                trial_values_denorm[i], trial_values_denorm[i + 1]
+            ])
+
+        frequencies[i] = numpy.mean(numpy.logical_and(
+            predictor_table_denorm[trial_predictor_name].values >=
+            lower_bin_edge,
+            predictor_table_denorm[trial_predictor_name].values <
+            upper_bin_edge
+        ))
+
+    return trial_values_denorm, mean_probabilities, frequencies
+
+
+def plot_pdp(trial_predictor_name, trial_values_denorm, mean_probabilities,
+             frequencies):
+    """Plots partial-dependence plot (PDP).
+
+    T = number of trial values
+
+    :param trial_predictor_name: See doc for `make_pdp_inputs`.
+    :param trial_values_denorm: Same.
+    :param mean_probabilities: Same.
+    :param frequencies: Same.
+    :return: figure_object: Figure handle (instance of
+        `matplotlib.figure.Figure`).
+    :return: axes_object: Axes handle (instance of
+        `matplotlib.axes._subplots.AxesSubplot`).
+    """
+
+    _, main_axes_object = pyplot.subplots(
+        1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
+    )
+
+    histogram_axes_object = main_axes_object.twinx()
+    main_axes_object.set_zorder(histogram_axes_object.get_zorder() + 1)
+    main_axes_object.patch.set_visible(False)
+
+    main_axes_object.plot(
+        trial_values_denorm, mean_probabilities,
+        color=GREEN_COLOUR, linewidth=2
+    )
+
+    histogram_axes_object.bar(
+        x=trial_values_denorm, height=frequencies, width=1.,
+        color=HISTOGRAM_FACE_COLOUR, edgecolor=HISTOGRAM_EDGE_COLOUR,
+        linewidth=HISTOGRAM_EDGE_WIDTH
+    )
+
+    histogram_axes_object.set_ylabel('Frequency of occurrence')
+    main_axes_object.set_xlabel('{0:s} value'.format(trial_predictor_name))
+    main_axes_object.set_ylabel('Mean forecast probability')
