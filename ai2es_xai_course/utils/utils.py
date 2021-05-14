@@ -3173,9 +3173,9 @@ def plot_j_measures(j_measures, predictor_names):
 
     for j in range(num_predictors):
         axes_object.text(
-            0, y_coords[j], predictor_names[j], color=BAR_GRAPH_FONT_COLOUR,
-            horizontalalignment='left', verticalalignment='center',
-            fontsize=BAR_GRAPH_FONT_SIZE
+            0.01 * x_max, y_coords[j], '      ' + predictor_names[j],
+            color=BAR_GRAPH_FONT_COLOUR, fontsize=BAR_GRAPH_FONT_SIZE,
+            horizontalalignment='left', verticalalignment='center'
         )
 
 
