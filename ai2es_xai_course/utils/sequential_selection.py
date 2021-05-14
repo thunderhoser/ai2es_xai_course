@@ -9,9 +9,9 @@ import sklearn.metrics
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as pyplot
-from gewittergefahr.gg_utils import model_evaluation as model_eval
-from gewittergefahr.gg_utils import error_checking
-from gewittergefahr.plotting import plotting_utils
+
+MIN_PROB_FOR_XENTROPY = numpy.finfo(float).eps
+MAX_PROB_FOR_XENTROPY = 1. - numpy.finfo(float).eps
 
 FONT_SIZE = 30
 FEATURE_NAME_FONT_SIZE = 18
@@ -56,61 +56,6 @@ BACKWARD_SELECTION_TYPE = 'backward'
 
 MIN_PROBABILITY = 1e-15
 MAX_PROBABILITY = 1. - MIN_PROBABILITY
-
-
-def _check_sequential_selection_inputs(
-        training_table, validation_table, feature_names, target_name,
-        num_features_to_add_per_step=1, num_features_to_remove_per_step=1,
-        testing_table=None):
-    """Checks inputs for sequential forward or backward selection.
-
-    :param training_table: pandas DataFrame, where each row is one training
-        example.
-    :param validation_table: pandas DataFrame, where each row is one validation
-        example.
-    :param feature_names: length-F list with names of features (predictor
-        variables).  Each feature must be a column in training_table,
-        validation_table, and testing_table.
-    :param target_name: Name of target variable (predictand).  Must be a column
-        in training_table, validation_table, and testing_table.
-    :param num_features_to_add_per_step: Number of features to add at each
-        forward step.
-    :param num_features_to_remove_per_step: Number of features to remove at each
-        backward step.
-    :param testing_table: pandas DataFrame, where each row is one testing
-        example.
-    """
-
-    error_checking.assert_is_string_list(feature_names)
-    error_checking.assert_is_numpy_array(
-        numpy.asarray(feature_names), num_dimensions=1)
-
-    error_checking.assert_is_string(target_name)
-    variable_names = feature_names + [target_name]
-    error_checking.assert_columns_in_dataframe(training_table, variable_names)
-    error_checking.assert_columns_in_dataframe(validation_table, variable_names)
-    if testing_table is not None:
-        error_checking.assert_columns_in_dataframe(
-            testing_table, variable_names)
-
-    num_features = len(feature_names)
-    error_checking.assert_is_integer(num_features_to_add_per_step)
-    error_checking.assert_is_geq(num_features_to_add_per_step, 1)
-    error_checking.assert_is_less_than(
-        num_features_to_add_per_step, num_features)
-
-    error_checking.assert_is_integer(num_features_to_remove_per_step)
-    error_checking.assert_is_geq(num_features_to_remove_per_step, 1)
-    error_checking.assert_is_less_than(
-        num_features_to_remove_per_step, num_features)
-
-    # Ensure that label is binary.
-    error_checking.assert_is_integer_numpy_array(
-        training_table[target_name].values)
-    error_checking.assert_is_geq_numpy_array(
-        training_table[target_name].values, 0)
-    error_checking.assert_is_leq_numpy_array(
-        training_table[target_name].values, 1)
 
 
 def _forward_selection_step(
@@ -239,6 +184,29 @@ def _backward_selection_step(
     return min_cost, list_of_selected_feature_combos[worst_index]
 
 
+def get_cross_entropy(forecast_probabilities=None, observed_labels=None):
+    """Computes cross-entropy.
+
+    :param forecast_probabilities: See documentation for
+        `_check_forecast_probs_and_observed_labels`.
+    :param observed_labels: See doc for
+        `_check_forecast_probs_and_observed_labels`.
+    :return: cross_entropy: Cross-entropy.
+    """
+
+    forecast_probabilities = numpy.maximum(
+        forecast_probabilities, MIN_PROB_FOR_XENTROPY)
+    forecast_probabilities = numpy.minimum(
+        forecast_probabilities, MAX_PROB_FOR_XENTROPY)
+
+    observed_labels = observed_labels.astype(numpy.float)
+
+    return -numpy.mean(
+        observed_labels * numpy.log2(forecast_probabilities) +
+        (1 - observed_labels) * numpy.log2(1 - forecast_probabilities)
+    )
+
+
 def _evaluate_feature_selection(
         training_table, validation_table, testing_table, estimator_object,
         selected_feature_names, target_name):
@@ -283,7 +251,7 @@ def _evaluate_feature_selection(
 
     forecast_probs_for_validation = new_estimator_object.predict_proba(
         validation_table.as_matrix(columns=selected_feature_names))[:, 1]
-    validation_cross_entropy = model_eval.get_cross_entropy(
+    validation_cross_entropy = get_cross_entropy(
         forecast_probs_for_validation,
         validation_table[target_name].values)
     validation_auc = sklearn.metrics.roc_auc_score(
@@ -291,7 +259,7 @@ def _evaluate_feature_selection(
 
     forecast_probs_for_testing = new_estimator_object.predict_proba(
         testing_table.as_matrix(columns=selected_feature_names))[:, 1]
-    testing_cross_entropy = model_eval.get_cross_entropy(
+    testing_cross_entropy = get_cross_entropy(
         forecast_probs_for_testing, testing_table[target_name].values)
     testing_auc = sklearn.metrics.roc_auc_score(
         testing_table[target_name].values, forecast_probs_for_testing)
@@ -360,9 +328,9 @@ def _plot_selection_results(
 
     axes_object.bar(
         x_coords_at_bar_centers, y_values, x_width_of_bar,
-        color=plotting_utils.colour_from_numpy_to_tuple(bar_face_colour),
-        edgecolor=plotting_utils.colour_from_numpy_to_tuple(bar_edge_colour),
-        linewidth=bar_edge_width)
+        color=bar_face_colour, edgecolor=bar_edge_colour,
+        linewidth=bar_edge_width
+    )
 
     pyplot.xticks(x_coords_at_bar_centers, axes=axes_object)
 
@@ -472,14 +440,14 @@ def sequential_forward_selection(
         ...; etc.
     """
 
-    _check_sequential_selection_inputs(
-        training_table=training_table, validation_table=validation_table,
-        testing_table=testing_table, feature_names=feature_names,
-        target_name=target_name,
-        num_features_to_add_per_step=num_features_to_add_per_step)
+    # _check_sequential_selection_inputs(
+    #     training_table=training_table, validation_table=validation_table,
+    #     testing_table=testing_table, feature_names=feature_names,
+    #     target_name=target_name,
+    #     num_features_to_add_per_step=num_features_to_add_per_step)
 
-    error_checking.assert_is_greater(min_fractional_cost_decrease, 0.)
-    error_checking.assert_is_less_than(min_fractional_cost_decrease, 1.)
+    assert min_fractional_cost_decrease > 0.
+    assert min_fractional_cost_decrease > 1.
 
     # Initialize values.
     selected_feature_names = []
@@ -585,14 +553,14 @@ def sequential_backward_selection(
         removed; ...; etc.
     """
 
-    _check_sequential_selection_inputs(
-        training_table=training_table, validation_table=validation_table,
-        testing_table=testing_table, feature_names=feature_names,
-        target_name=target_name,
-        num_features_to_remove_per_step=num_features_to_remove_per_step)
+    # _check_sequential_selection_inputs(
+    #     training_table=training_table, validation_table=validation_table,
+    #     testing_table=testing_table, feature_names=feature_names,
+    #     target_name=target_name,
+    #     num_features_to_remove_per_step=num_features_to_remove_per_step)
 
-    error_checking.assert_is_greater(min_fractional_cost_decrease, -1.)
-    error_checking.assert_is_less_than(min_fractional_cost_decrease, 1.)
+    assert min_fractional_cost_decrease > -1.
+    assert min_fractional_cost_decrease < 1.
 
     # Initialize values.
     removed_feature_names = []
