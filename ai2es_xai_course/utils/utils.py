@@ -3200,14 +3200,13 @@ def _get_trial_values_for_pdp(predictor_values, num_trial_values):
 
 
 def make_pdp_inputs(
-        neural_net_object, predictor_table_norm, predictor_table_denorm,
+        model_object, predictor_table_norm, predictor_table_denorm,
         normalization_dict, trial_predictor_name, num_trial_values):
     """Makes inputs for partial-dependence plot (PDP).
 
     T = number of trial values
 
-    :param neural_net_object: Trained neural net (instance of
-        `keras.models.Model` or `keras.models.Sequential`).
+    :param model_object: Trained Keras neural net or scikit-learn model.
     :param predictor_table_norm: pandas DataFrame with normalized predictor
         values.  Each row is one storm object.
     :param predictor_table_denorm: Same but with denormalized predictors.
@@ -3221,9 +3220,6 @@ def make_pdp_inputs(
     :return: frequencies: length-T numpy array of frequencies, indicating how
         often each value occurs in the dataset.
     """
-
-    # TODO(thunderhoser): Make this method work for models other than a neural
-    # net.  It would be an easy fix.
 
     trial_values_denorm = _get_trial_values_for_pdp(
         predictor_values=predictor_table_denorm[trial_predictor_name].values,
@@ -3246,14 +3242,20 @@ def make_pdp_inputs(
             trial_predictor_table_norm[trial_predictor_name].values[i]
         )
 
-        print('Applying neural net to data with {0:s} = {1:.2g}...'.format(
+        print('Applying model to data with {0:s} = {1:.2g}...'.format(
             trial_predictor_name, trial_values_denorm[i]
         ))
-        these_probs = apply_neural_net(
-            model_object=neural_net_object,
-            predictor_matrix=this_predictor_table_norm.to_numpy(),
-            num_examples_per_batch=1024, verbose=False
-        )
+
+        if 'sklearn' in str(type(model_object)):
+            these_probs = model_object.predict_proba(
+                this_predictor_table_norm.to_numpy()
+            )[:, 1]
+        else:
+            these_probs = apply_neural_net(
+                model_object=model_object,
+                predictor_matrix=this_predictor_table_norm.to_numpy(),
+                num_examples_per_batch=1024, verbose=False
+            )
         mean_probabilities[i] = numpy.mean(these_probs)
 
         if i == 0:
