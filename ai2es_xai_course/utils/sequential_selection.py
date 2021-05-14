@@ -116,7 +116,7 @@ def _backward_selection_step(
 def run_forward_selection(
         training_predictor_table, validation_predictor_table,
         training_target_table, validation_target_table, sklearn_model_object,
-        min_fractional_cost_decrease=0.01):
+        min_fractional_cost_decrease=0.0033):
     """Runs sequential forward selection.
 
     P = number of predictors selected
@@ -193,7 +193,7 @@ def run_forward_selection(
 def run_backward_selection(
         training_predictor_table, validation_predictor_table,
         training_target_table, validation_target_table, sklearn_model_object,
-        min_fractional_cost_decrease=-0.01):
+        min_fractional_cost_decrease=-0.0033):
     """Runs sequential backward selection.
 
     P = number of predictors removed
@@ -299,7 +299,7 @@ def plot_results(
 
     y_coords = numpy.linspace(
         0, num_predictors_to_plot - 1, num=num_predictors_to_plot, dtype=float
-    )
+    )[::-1]
 
     if axes_object is None:
         _, axes_object = pyplot.subplots(
