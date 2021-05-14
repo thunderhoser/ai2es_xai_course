@@ -9,6 +9,7 @@ import sklearn.metrics
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as pyplot
+from ai2es_xai_course.utils import utils
 
 MIN_PROB_FOR_XENTROPY = numpy.finfo(float).eps
 MAX_PROB_FOR_XENTROPY = 1. - numpy.finfo(float).eps
@@ -56,74 +57,6 @@ BACKWARD_SELECTION_TYPE = 'backward'
 
 MIN_PROBABILITY = 1e-15
 MAX_PROBABILITY = 1. - MIN_PROBABILITY
-
-
-def _forward_selection_step(
-        training_table, validation_table, selected_feature_names,
-        remaining_feature_names, target_name, estimator_object, cost_function,
-        num_features_to_add=1):
-    """Performs one forward selection step (i.e., adds features to the model).
-
-    The best set of L features is added to the model, where L >= 1.
-
-    Each member of `selected_feature_names` and `remaining_feature_names`, as
-    well as `target_name`, must be a column in both `training_table` and
-    `validation_table`.
-
-    :param training_table: pandas DataFrame, where each row is one training
-        example.
-    :param validation_table: pandas DataFrame, where each row is one validation
-        example.
-    :param selected_feature_names: 1-D list with names of selected features
-        (those already in the model).
-    :param remaining_feature_names: 1-D list with names of remaining features
-        (those which may be added to the model).
-    :param target_name: Name of target variable (predictand).
-    :param estimator_object: Instance of scikit-learn estimator.  Must implement
-        the methods `fit` and `predict_proba`.
-    :param cost_function: Cost function to be minimized.  Should have the
-        following format.  E = number of examples, and K = number of classes.
-    Input: class_probability_matrix: E-by-K numpy array of predicted
-        probabilities, where class_probability_matrix[i, k] = probability that
-        [i]th example belongs to [k]th class.
-    Input: observed_values: length-E numpy array of observed values (integer
-        class labels).
-    Output: cost: Scalar value.
-
-    :param num_features_to_add: Number of features to add (L in the above
-        discussion).
-    :return: min_cost: Minimum cost given by adding any set of L features from
-        `remaining_feature_names` to the model.
-    :return: best_feature_names: length-L list of features whose addition
-        resulted in `min_cost`.
-    """
-
-    combination_object = combinations(
-        remaining_feature_names, num_features_to_add)
-    list_of_remaining_feature_combos = []
-    for this_tuple in list(combination_object):
-        list_of_remaining_feature_combos.append(list(this_tuple))
-
-    num_remaining_feature_combos = len(list_of_remaining_feature_combos)
-    cost_by_feature_combo = numpy.full(num_remaining_feature_combos, numpy.nan)
-
-    for j in range(num_remaining_feature_combos):
-        these_feature_names = (
-            selected_feature_names + list_of_remaining_feature_combos[j])
-
-        new_estimator_object = sklearn.base.clone(estimator_object)
-        new_estimator_object.fit(
-            training_table.as_matrix(columns=these_feature_names),
-            training_table[target_name].values)
-
-        this_probability_matrix = new_estimator_object.predict_proba(
-            validation_table.as_matrix(columns=these_feature_names))
-        cost_by_feature_combo[j] = cost_function(
-            this_probability_matrix, validation_table[target_name].values)
-
-    min_cost = numpy.min(cost_by_feature_combo)
-    best_index = numpy.argmin(cost_by_feature_combo)
-    return min_cost, list_of_remaining_feature_combos[best_index]
 
 
 def _backward_selection_step(
@@ -205,70 +138,6 @@ def get_cross_entropy(forecast_probabilities=None, observed_labels=None):
         observed_labels * numpy.log2(forecast_probabilities) +
         (1 - observed_labels) * numpy.log2(1 - forecast_probabilities)
     )
-
-
-def _evaluate_feature_selection(
-        training_table, validation_table, testing_table, estimator_object,
-        selected_feature_names, target_name):
-    """Evaluates feature selection.
-
-    Specifically, this method computes 4 performance metrics:
-
-    - validation cross-entropy
-    - validation AUC (area under ROC curve)
-    - testing cross-entropy
-    - testing AUC
-
-    :param training_table: pandas DataFrame, where each row is one training
-        example.
-    :param validation_table: pandas DataFrame, where each row is one validation
-        example.
-    :param testing_table: pandas DataFrame, where each row is one testing
-        example.
-    :param estimator_object: Instance of scikit-learn estimator.  Must implement
-        the methods `fit` and `predict_proba`.
-    :param selected_feature_names: 1-D list with names of selected features.
-        Each one must be a column in training_table, validation_table, and
-        testing_table.
-    :param target_name: Name of target variable (predictand).  Must be a column
-        in training_table, validation_table, and testing_table.
-    :return: feature_selection_dict: Dictionary with the following keys.
-    feature_selection_dict['selected_feature_names']: 1-D list with names of
-        selected features.
-    feature_selection_dict['validation_cross_entropy']: Cross-entropy on
-        validation data.
-    feature_selection_dict['validation_auc']: Area under ROC curve on validation
-        data.
-    feature_selection_dict['testing_cross_entropy']: Cross-entropy on testing
-        data.
-    feature_selection_dict['testing_auc']: Area under ROC curve on testing data.
-    """
-
-    new_estimator_object = sklearn.base.clone(estimator_object)
-    new_estimator_object.fit(
-        training_table.as_matrix(columns=selected_feature_names),
-        training_table[target_name].values)
-
-    forecast_probs_for_validation = new_estimator_object.predict_proba(
-        validation_table.as_matrix(columns=selected_feature_names))[:, 1]
-    validation_cross_entropy = get_cross_entropy(
-        forecast_probs_for_validation,
-        validation_table[target_name].values)
-    validation_auc = sklearn.metrics.roc_auc_score(
-        validation_table[target_name].values, forecast_probs_for_validation)
-
-    forecast_probs_for_testing = new_estimator_object.predict_proba(
-        testing_table.as_matrix(columns=selected_feature_names))[:, 1]
-    testing_cross_entropy = get_cross_entropy(
-        forecast_probs_for_testing, testing_table[target_name].values)
-    testing_auc = sklearn.metrics.roc_auc_score(
-        testing_table[target_name].values, forecast_probs_for_testing)
-
-    return {SELECTED_FEATURES_KEY: selected_feature_names,
-            VALIDATION_XENTROPY_KEY: validation_cross_entropy,
-            VALIDATION_AUC_KEY: validation_auc,
-            TESTING_XENTROPY_KEY: testing_cross_entropy,
-            TESTING_AUC_KEY: testing_auc}
 
 
 def _plot_selection_results(
@@ -407,27 +276,74 @@ def _cross_entropy_function(class_probability_matrix, observed_values):
     ) / num_examples
 
 
-def sequential_forward_selection(
-        training_table, validation_table, testing_table, feature_names,
-        target_name, estimator_object, cost_function=_cross_entropy_function,
-        num_features_to_add_per_step=1, min_fractional_cost_decrease=
-        MIN_FRACTIONAL_COST_DECREASE_SFS_DEFAULT):
-    """Runs the SFS (sequential forward selection) algorithm.
+def _forward_selection_step(
+        training_predictor_table, validation_predictor_table,
+        training_target_table, validation_target_table,
+        remaining_predictor_names, sklearn_model_object):
+    """Runs one step of sequential forward selection.
 
-    SFS is defined in Chapter 9 of Webb (2003).
+    :param training_predictor_table: See doc for `run_forward_selection`.
+    :param validation_predictor_table: Same.
+    :param training_target_table: Same.
+    :param validation_target_table: Same.
+    :param remaining_predictor_names: 1-D list with names of predictors not yet
+        selected.
+    :param sklearn_model_object: See doc for `run_forward_selection`.
+    :return: min_cost: Minimum cost given by adding any set of L features from
+        `remaining_feature_names` to the model.
+    :return: best_feature_names: length-L list of features whose addition
+        resulted in `min_cost`.
+    """
 
-    f = number of features selected
+    selected_predictor_names = list(
+        set(list(training_predictor_table)) -
+        set(remaining_predictor_names)
+    )
 
-    :param training_table: See documentation for
-        _check_sequential_selection_inputs.
-    :param validation_table: See doc for _check_sequential_selection_inputs.
-    :param testing_table: See doc for _check_sequential_selection_inputs.
-    :param feature_names: See doc for _check_sequential_selection_inputs.
-    :param target_name: See doc for _check_sequential_selection_inputs.
-    :param estimator_object: Instance of scikit-learn estimator.  Must implement
-        the methods `fit` and `predict_proba`.
-    :param cost_function: See doc for `_forward_selection_step`.
-    :param num_features_to_add_per_step: Number of features to add at each step.
+    num_remaining_predictors = len(remaining_predictor_names)
+    negative_auc_scores = numpy.full(num_remaining_predictors, numpy.nan)
+
+    for j in range(num_remaining_predictors):
+        these_predictor_names = (
+            selected_predictor_names + [remaining_predictor_names[j]]
+        )
+
+        new_model_object = sklearn.base.clone(sklearn_model_object)
+        new_model_object.fit(
+            X=training_predictor_table[these_predictor_names].to_numpy(),
+            y=training_target_table[utils.BINARIZED_TARGET_NAME].values
+        )
+
+        these_forecast_probs = new_model_object.predict_proba(
+            validation_predictor_table[these_predictor_names].to_numpy()
+        )[:, 1]
+
+        negative_auc_scores[j] = sklearn.metrics.roc_auc_score(
+            validation_target_table[utils.BINARIZED_TARGET_NAME].values,
+            these_forecast_probs
+        )
+
+    negative_auc_scores *= -1
+
+    min_cost = numpy.min(negative_auc_scores)
+    best_index = numpy.argmin(negative_auc_scores)
+    return min_cost, remaining_predictor_names[best_index]
+
+
+def run_forward_selection(
+        training_predictor_table, validation_predictor_table,
+        training_target_table, validation_target_table, sklearn_model_object,
+        min_fractional_cost_decrease=0.01):
+    """Runs sequential forward selection.
+
+    :param training_predictor_table: pandas DataFrame with predictor values.
+        Each row is one storm object in the training set.
+    :param validation_predictor_table: Same but for validation set.
+    :param training_target_table: pandas DataFrame with target values.  Each row
+        is one storm object in the training set.
+    :param validation_target_table: Same but for validation set.
+    :param sklearn_model_object: Trained scikit-learn model.  Must implement the
+        methods `fit` and `predict_proba`.
     :param min_fractional_cost_decrease: Stopping criterion.  Once the
         fractional cost decrease over one step is <
         `min_fractional_cost_decrease`, SFS will stop.  Must be in range (0, 1).
@@ -440,26 +356,22 @@ def sequential_forward_selection(
         ...; etc.
     """
 
-    # _check_sequential_selection_inputs(
-    #     training_table=training_table, validation_table=validation_table,
-    #     testing_table=testing_table, feature_names=feature_names,
-    #     target_name=target_name,
-    #     num_features_to_add_per_step=num_features_to_add_per_step)
+    # TODO(thunderhoser): Clean output doc.
 
     assert min_fractional_cost_decrease > 0.
     assert min_fractional_cost_decrease > 1.
 
     # Initialize values.
-    selected_feature_names = []
-    remaining_feature_names = copy.deepcopy(feature_names)
+    selected_predictor_names = []
+    remaining_predictor_names = list(training_predictor_table)
 
-    num_features = len(feature_names)
-    min_cost_by_num_selected = numpy.full(num_features + 1, numpy.nan)
+    num_predictors = len(remaining_predictor_names)
+    min_cost_by_num_selected = numpy.full(num_predictors + 1, numpy.nan)
     min_cost_by_num_selected[0] = numpy.inf
 
-    while len(remaining_feature_names) >= num_features_to_add_per_step:
-        num_selected_features = len(selected_feature_names)
-        num_remaining_features = len(remaining_feature_names)
+    while len(remaining_predictor_names) > 0:
+        num_selected_features = len(selected_predictor_names)
+        num_remaining_features = len(remaining_predictor_names)
 
         print((
             'Step {0:d} of sequential forward selection: {1:d} features '
@@ -469,20 +381,23 @@ def sequential_forward_selection(
             num_remaining_features
         ))
 
-        min_new_cost, these_best_feature_names = _forward_selection_step(
-            training_table=training_table, validation_table=validation_table,
-            selected_feature_names=selected_feature_names,
-            remaining_feature_names=remaining_feature_names,
-            target_name=target_name, estimator_object=estimator_object,
-            cost_function=cost_function,
-            num_features_to_add=num_features_to_add_per_step)
+        min_new_cost, this_best_predictor_name = _forward_selection_step(
+            training_predictor_table=training_predictor_table,
+            validation_predictor_table=validation_predictor_table,
+            training_target_table=training_target_table,
+            validation_target_table=validation_target_table,
+            remaining_predictor_names=remaining_predictor_names,
+            sklearn_model_object=sklearn_model_object
+        )
+
+        these_best_predictor_names = [this_best_predictor_name]
 
         print((
             'Minimum cost ({0:.4f}) given by adding features shown below '
             '(previous minimum = {1:.4f}).\n{2:s}\n'
         ).format(
             min_new_cost, min_cost_by_num_selected[num_selected_features],
-            str(these_best_feature_names)
+            str(these_best_predictor_names)
         ))
 
         stopping_criterion = min_cost_by_num_selected[num_selected_features] * (
@@ -492,29 +407,24 @@ def sequential_forward_selection(
         if min_new_cost > stopping_criterion:
             break
 
-        selected_feature_names += these_best_feature_names
-        remaining_feature_names = [
-            s for s in remaining_feature_names
-            if s not in these_best_feature_names
+        selected_predictor_names += these_best_predictor_names
+        remaining_predictor_names = [
+            s for s in remaining_predictor_names
+            if s not in these_best_predictor_names
         ]
 
         min_cost_by_num_selected[
-            (num_selected_features + 1):(len(selected_feature_names) + 1)
+            (num_selected_features + 1):(len(selected_predictor_names) + 1)
         ] = min_new_cost
 
-    sfs_dictionary = _evaluate_feature_selection(
-        training_table=training_table, validation_table=validation_table,
-        testing_table=testing_table, estimator_object=estimator_object,
-        selected_feature_names=selected_feature_names, target_name=target_name)
+    # num_selected_features = len(selected_predictor_names)
+    #
+    # sfs_dictionary.update({
+    #     VALIDATION_COST_BY_STEP_KEY:
+    #         min_cost_by_num_selected[1:(num_selected_features + 1)]
+    # })
 
-    num_selected_features = len(selected_feature_names)
-
-    sfs_dictionary.update({
-        VALIDATION_COST_BY_STEP_KEY:
-            min_cost_by_num_selected[1:(num_selected_features + 1)]
-    })
-
-    return sfs_dictionary
+    return None
 
 
 def sequential_backward_selection(
@@ -614,20 +524,15 @@ def sequential_backward_selection(
             (num_removed_features + 1):(len(removed_feature_names) + 1)
         ] = min_new_cost
 
-    sbs_dictionary = _evaluate_feature_selection(
-        training_table=training_table, validation_table=validation_table,
-        testing_table=testing_table, estimator_object=estimator_object,
-        selected_feature_names=selected_feature_names, target_name=target_name)
+    # num_removed_features = len(removed_feature_names)
+    #
+    # sbs_dictionary.update({
+    #     REMOVED_FEATURES_KEY: removed_feature_names,
+    #     VALIDATION_COST_BY_STEP_KEY:
+    #         min_cost_by_num_removed[1:(num_removed_features + 1)]
+    # })
 
-    num_removed_features = len(removed_feature_names)
-
-    sbs_dictionary.update({
-        REMOVED_FEATURES_KEY: removed_feature_names,
-        VALIDATION_COST_BY_STEP_KEY:
-            min_cost_by_num_removed[1:(num_removed_features + 1)]
-    })
-
-    return sbs_dictionary
+    return None
 
 
 def plot_forward_selection_results(
