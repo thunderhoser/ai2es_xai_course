@@ -4,9 +4,7 @@ import copy
 import numpy
 import sklearn.base
 import sklearn.metrics
-import matplotlib
-matplotlib.use('agg')
-import matplotlib.pyplot as pyplot
+from matplotlib import pyplot
 from ai2es_xai_course.utils import utils
 
 MIN_PROB_FOR_XENTROPY = numpy.finfo(float).eps
