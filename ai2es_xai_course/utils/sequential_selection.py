@@ -359,7 +359,7 @@ def run_forward_selection(
     # TODO(thunderhoser): Clean output doc.
 
     assert min_fractional_cost_decrease > 0.
-    assert min_fractional_cost_decrease > 1.
+    assert min_fractional_cost_decrease < 1.
 
     # Initialize values.
     selected_predictor_names = []
