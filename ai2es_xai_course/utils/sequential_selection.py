@@ -350,14 +350,13 @@ def run_forward_selection(
             (num_selected_features + 1):(len(selected_predictor_names) + 1)
         ] = min_new_cost
 
-    # num_selected_features = len(selected_predictor_names)
-    #
-    # sfs_dictionary.update({
-    #     VALIDATION_COST_BY_STEP_KEY:
-    #         min_cost_by_num_selected[1:(num_selected_features + 1)]
-    # })
+    num_selected_features = len(selected_predictor_names)
 
-    return None
+    return {
+        SELECTED_FEATURES_KEY: selected_predictor_names,
+        VALIDATION_COST_BY_STEP_KEY:
+            min_cost_by_num_selected[1:(num_selected_features + 1)]
+    }
 
 
 def run_backward_selection(
@@ -446,15 +445,13 @@ def run_backward_selection(
             (num_removed_features + 1):(len(removed_predictor_names) + 1)
         ] = min_new_cost
 
-    # num_removed_features = len(removed_predictor_names)
-    #
-    # sbs_dictionary.update({
-    #     REMOVED_FEATURES_KEY: removed_predictor_names,
-    #     VALIDATION_COST_BY_STEP_KEY:
-    #         min_cost_by_num_removed[1:(num_removed_features + 1)]
-    # })
+    num_removed_features = len(removed_predictor_names)
 
-    return None
+    return {
+        REMOVED_FEATURES_KEY: removed_predictor_names,
+        VALIDATION_COST_BY_STEP_KEY:
+            min_cost_by_num_removed[1:(num_removed_features + 1)]
+    }
 
 
 def plot_forward_selection_results(
