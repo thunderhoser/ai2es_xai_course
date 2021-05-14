@@ -183,7 +183,7 @@ def _forward_selection_step(
     )
 
     num_remaining_predictors = len(remaining_predictor_names)
-    negative_auc_scores = numpy.full(num_remaining_predictors, numpy.nan)
+    one_minus_auc_values = numpy.full(num_remaining_predictors, numpy.nan)
 
     for j in range(num_remaining_predictors):
         these_predictor_names = (
@@ -200,15 +200,15 @@ def _forward_selection_step(
             validation_predictor_table[these_predictor_names].to_numpy()
         )[:, 1]
 
-        negative_auc_scores[j] = sklearn.metrics.roc_auc_score(
+        one_minus_auc_values[j] = sklearn.metrics.roc_auc_score(
             validation_target_table[utils.BINARIZED_TARGET_NAME].values,
             these_forecast_probs
         )
 
-    negative_auc_scores *= -1
+    one_minus_auc_values = 1. - one_minus_auc_values
 
-    min_cost = numpy.min(negative_auc_scores)
-    best_index = numpy.argmin(negative_auc_scores)
+    min_cost = numpy.min(one_minus_auc_values)
+    best_index = numpy.argmin(one_minus_auc_values)
     return min_cost, remaining_predictor_names[best_index]
 
 
@@ -234,7 +234,7 @@ def _backward_selection_step(
     # TODO(thunderhoser): Clean output doc.
 
     num_selected_predictors = len(selected_predictor_names)
-    negative_auc_scores = numpy.full(num_selected_predictors, numpy.nan)
+    one_minus_auc_values = numpy.full(num_selected_predictors, numpy.nan)
 
     for j in range(num_selected_predictors):
         these_predictor_names = set(selected_predictor_names)
@@ -251,15 +251,15 @@ def _backward_selection_step(
             validation_predictor_table[these_predictor_names].to_numpy()
         )[:, 1]
 
-        negative_auc_scores[j] = sklearn.metrics.roc_auc_score(
+        one_minus_auc_values[j] = sklearn.metrics.roc_auc_score(
             validation_target_table[utils.BINARIZED_TARGET_NAME].values,
             these_forecast_probs
         )
 
-    negative_auc_scores *= -1
+    one_minus_auc_values = 1. - one_minus_auc_values
 
-    min_cost = numpy.min(negative_auc_scores)
-    worst_index = numpy.argmin(negative_auc_scores)
+    min_cost = numpy.min(one_minus_auc_values)
+    worst_index = numpy.argmin(one_minus_auc_values)
     return min_cost, selected_predictor_names[worst_index]
 
 
