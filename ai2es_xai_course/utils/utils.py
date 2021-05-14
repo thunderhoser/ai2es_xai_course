@@ -3309,8 +3309,14 @@ def plot_pdp(trial_predictor_name, trial_values_denorm, mean_probabilities,
         color=GREEN_COLOUR, linewidth=2
     )
 
+    forward_diffs = numpy.diff(trial_values_denorm)
+    backwards_diffs = -1 * numpy.diff(trial_values_denorm[::-1])[::-1]
+    forward_diffs = numpy.concatenate((forward_diffs, backwards_diffs[[-1]]))
+    backwards_diffs = numpy.concatenate((forward_diffs[[0]], backwards_diffs))
+    bar_widths = (forward_diffs + backwards_diffs) / 2
+
     histogram_axes_object.bar(
-        x=trial_values_denorm, height=frequencies, width=1.,
+        x=trial_values_denorm, height=frequencies, width=bar_widths,
         color=HISTOGRAM_FACE_COLOUR, edgecolor=HISTOGRAM_EDGE_COLOUR,
         linewidth=HISTOGRAM_EDGE_WIDTH
     )
