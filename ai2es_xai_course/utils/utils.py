@@ -3326,3 +3326,44 @@ def plot_pdp(trial_predictor_name, trial_values_denorm, mean_probabilities,
     histogram_axes_object.set_ylabel('Frequency of occurrence')
     main_axes_object.set_xlabel('{0:s} value'.format(trial_predictor_name))
     main_axes_object.set_ylabel('Mean forecast probability')
+
+
+def plot_gini_importances(gini_importances, predictor_names):
+    """Plots Gini importances.
+
+    P = number of predictor variables
+
+    :param gini_importances: length-P numpy array of Gini importances.
+    :param predictor_names: length-P list of predictor names.
+    """
+
+    num_predictors = len(predictor_names)
+    y_coords = numpy.linspace(
+        0, num_predictors - 1, num=num_predictors, dtype=float
+    )
+
+    _, axes_object = pyplot.subplots(
+        1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
+    )
+
+    axes_object.barh(
+        y_coords, gini_importances, color=BAR_GRAPH_COLOUR,
+        edgecolor=BAR_GRAPH_COLOUR, linewidth=BAR_GRAPH_EDGE_WIDTH
+    )
+
+    pyplot.xlabel('Gini importance')
+    pyplot.ylabel('Predictor variable')
+
+    pyplot.yticks([], [])
+    x_tick_values, _ = pyplot.xticks()
+    pyplot.xticks(x_tick_values, rotation=90)
+
+    x_max = numpy.percentile(gini_importances, 99.)
+    pyplot.xlim([0., x_max])
+
+    for j in range(num_predictors):
+        axes_object.text(
+            0.01 * x_max, y_coords[j], '      ' + predictor_names[j],
+            color=BAR_GRAPH_FONT_COLOUR, fontsize=BAR_GRAPH_FONT_SIZE,
+            horizontalalignment='left', verticalalignment='center'
+        )
