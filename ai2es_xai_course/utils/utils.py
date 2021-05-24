@@ -2812,6 +2812,50 @@ def plot_saliency(saliency_values, predictor_names):
         )
 
 
+def plot_absolute_input_times_grad(abs_input_times_grad_values,
+                                   predictor_names):
+    """Plots absolute input * gradient values.
+
+    P = number of predictor variables
+
+    :param abs_input_times_grad_values: length-P numpy array of absolute
+        input * gradient values.
+    :param predictor_names: length-P list of predictor names.
+    """
+
+    num_predictors = len(predictor_names)
+    y_coords = numpy.linspace(
+        0, num_predictors - 1, num=num_predictors, dtype=float
+    )
+
+    _, axes_object = pyplot.subplots(
+        1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
+    )
+
+    axes_object.barh(
+        y_coords, abs_input_times_grad_values, color=BAR_GRAPH_COLOUR,
+        edgecolor=BAR_GRAPH_COLOUR, linewidth=BAR_GRAPH_EDGE_WIDTH
+    )
+
+    pyplot.xlabel('Absolute input * gradient')
+    pyplot.ylabel('Predictor variable')
+
+    pyplot.yticks([], [])
+    x_tick_values, _ = pyplot.xticks()
+    pyplot.xticks(x_tick_values, rotation=90)
+
+    x_max = numpy.percentile(abs_input_times_grad_values, 99.)
+    pyplot.xlim([0, x_max])
+
+    for j in range(num_predictors):
+        axes_object.text(
+            0, y_coords[j], '      ' + predictor_names[j],
+            color=BAR_GRAPH_FONT_COLOUR,
+            horizontalalignment='center', verticalalignment='center',
+            fontsize=BAR_GRAPH_FONT_SIZE
+        )
+
+
 def find_extreme_examples(
         observed_labels, forecast_probabilities, num_examples_per_set):
     """Finds extreme examples.
