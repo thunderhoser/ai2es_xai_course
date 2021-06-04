@@ -156,27 +156,32 @@ def normalize_occlusion_maps(occlusion_prob_matrix, original_probs):
 
 def plot_normalized_occlusion_map(
         normalized_occlusion_matrix_2d, axes_object, colour_map_object,
-        contour_interval, line_width=DEFAULT_LINE_WIDTH):
+        max_contour_value, contour_interval, line_width=DEFAULT_LINE_WIDTH):
     """Plots 2-D normalized occlusion map with line contours.
 
     :param normalized_occlusion_matrix_2d: See output doc for
         `normalize_occlusion_maps`.
     :param axes_object: See input doc for `plot_occlusion_map`.
     :param colour_map_object: Same.
+    :param max_contour_value: Same.
     :param contour_interval: Same.
     :param line_width: Same.
     """
 
     # Check input args.
+    assert max_contour_value >= 0.
+    max_contour_value = max([max_contour_value, 1e-6])
+
     assert contour_interval >= 0.
     contour_interval = max([contour_interval, 1e-7])
+    assert contour_interval < max_contour_value
 
     assert not numpy.any(numpy.isnan(normalized_occlusion_matrix_2d))
     assert len(normalized_occlusion_matrix_2d.shape) == 2
     assert numpy.all(normalized_occlusion_matrix_2d <= 1.)
 
     half_num_contours = int(numpy.round(
-        1 + 1. / contour_interval
+        1 + max_contour_value / contour_interval
     ))
 
     # Find grid coordinates.
@@ -194,7 +199,9 @@ def plot_normalized_occlusion_map(
     x_coord_matrix, y_coord_matrix = numpy.meshgrid(x_coords, y_coords)
 
     # Plot positive contours.
-    positive_contour_values = numpy.linspace(0., 1., num=half_num_contours)
+    positive_contour_values = numpy.linspace(
+        0., max_contour_value, num=half_num_contours
+    )
 
     axes_object.contour(
         x_coord_matrix, y_coord_matrix, normalized_occlusion_matrix_2d,
