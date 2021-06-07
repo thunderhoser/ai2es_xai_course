@@ -69,11 +69,7 @@ def get_occlusion_maps(
 
     for i in range(num_grid_rows):
         for j in range(num_grid_columns):
-            print((
-                'Occluding window centered on row {0:d}, column {1:d}...'
-            ).format(
-                i, j
-            ))
+            print('Occluding windows centered on row {0:d}...'.format(i + 1))
 
             first_row = max([i - half_window_size_px, 0])
             last_row = min([i + half_window_size_px + 1, num_grid_rows])
