@@ -150,7 +150,6 @@ def run_integrated_gradients(
             predictor_matrix_actual=predictor_matrix[i, ...],
             gradient_matrix=this_gradient_matrix
         )
-        print(integ_gradient_matrix[i, ...])
 
     print('Ran integrated-gradients method for all {0:d} examples!'.format(
         num_examples
