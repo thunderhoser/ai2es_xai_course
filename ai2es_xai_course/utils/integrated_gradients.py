@@ -3,7 +3,6 @@
 import numpy
 import tensorflow
 from keras import backend as K
-from ai2es_xai_course.utils import utils
 
 
 def _interp_predictors_one_example(predictor_matrix, num_steps):
@@ -51,11 +50,14 @@ def _compute_gradients(model_object, predictor_matrix_interp, target_class):
     num_output_neurons = (
         model_object.layers[-1].output.get_shape().as_list()[-1]
     )
+    predictor_tensor_interp = tensorflow.constant(
+        predictor_matrix_interp, dtype=tensorflow.float64
+    )
 
     with tensorflow.GradientTape() as tape_object:
-        tape_object.watch(predictor_matrix_interp)
+        tape_object.watch(predictor_tensor_interp)
         probability_array = model_object.predict(
-            predictor_matrix_interp, batch_size=predictor_matrix_interp.shape[0]
+            predictor_tensor_interp, batch_size=predictor_matrix_interp.shape[0]
         )
 
         if num_output_neurons == 1:
@@ -63,7 +65,10 @@ def _compute_gradients(model_object, predictor_matrix_interp, target_class):
         else:
             probabilities = probability_array[:, target_class]
 
-    return tape_object.gradient(probabilities, predictor_matrix_interp)
+    gradient_tensor = tape_object.gradient(
+        probabilities, predictor_tensor_interp
+    )
+    return K.eval(gradient_tensor)
 
 
 def _accumulate_gradients(predictor_matrix_actual, gradient_matrix):
