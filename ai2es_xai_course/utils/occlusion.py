@@ -68,9 +68,9 @@ def get_occlusion_maps(
     occlusion_prob_matrix = numpy.full(predictor_matrix.shape[:-1], numpy.nan)
 
     for i in range(num_grid_rows):
-        for j in range(num_grid_columns):
-            print('Occluding windows centered on row {0:d}...'.format(i + 1))
+        print('Occluding windows centered on row {0:d}...'.format(i + 1))
 
+        for j in range(num_grid_columns):
             first_row = max([i - half_window_size_px, 0])
             last_row = min([i + half_window_size_px + 1, num_grid_rows])
             first_column = max([j - half_window_size_px, 0])
