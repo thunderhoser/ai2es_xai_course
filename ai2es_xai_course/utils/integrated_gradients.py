@@ -56,21 +56,13 @@ def _compute_gradients(model_object, predictor_matrix_interp, target_class):
 
     with tensorflow.GradientTape() as tape_object:
         tape_object.watch(predictor_tensor_interp)
-        probability_array = model_object.predict(
-            predictor_tensor_interp,
-            batch_size=predictor_matrix_interp.shape[0], steps=1
-        )
+        probability_tensor = model_object(predictor_tensor_interp)
 
         if num_output_neurons == 1:
-            probabilities = probability_array
+            probability_tensor = probability_tensor
         else:
-            probabilities = probability_array[:, target_class]
+            probability_tensor = probability_tensor[:, target_class]
 
-    probability_tensor = tensorflow.constant(
-        probabilities, dtype=tensorflow.float64
-    )
-    print(predictor_tensor_interp)
-    print(probability_tensor)
     gradient_tensor = tape_object.gradient(
         probability_tensor, predictor_tensor_interp
     )
