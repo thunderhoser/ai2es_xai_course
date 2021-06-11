@@ -121,7 +121,7 @@ def run_integrated_gradients(
     assert num_interp_steps >= 10
 
     num_examples = predictor_matrix.shape[0]
-    integ_gradient_matrix = numpy.full(predictor_matrix, numpy.nan)
+    integ_gradient_matrix = numpy.full(predictor_matrix.shape, numpy.nan)
 
     for i in range(num_examples):
         if numpy.mod(i, 5) == 0:
