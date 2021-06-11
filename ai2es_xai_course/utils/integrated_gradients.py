@@ -66,7 +66,6 @@ def _compute_gradients(model_object, predictor_matrix_interp, target_class):
     gradient_tensor = tape_object.gradient(
         probability_tensor, predictor_tensor_interp
     )
-    print(gradient_tensor)
     return K.eval(gradient_tensor)
 
 
@@ -151,6 +150,7 @@ def run_integrated_gradients(
             predictor_matrix_actual=predictor_matrix[i, ...],
             gradient_matrix=this_gradient_matrix
         )
+        print(integ_gradient_matrix[i, ...])
 
     print('Ran integrated-gradients method for all {0:d} examples!'.format(
         num_examples
