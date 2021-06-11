@@ -66,7 +66,7 @@ def _compute_gradients(model_object, predictor_matrix_interp, target_class):
     gradient_tensor = tape_object.gradient(
         probability_tensor, predictor_tensor_interp
     )
-    return K.eval(gradient_tensor)
+    return tensorflow.make_ndarray(gradient_tensor)
 
 
 def _accumulate_gradients(predictor_matrix_actual, gradient_matrix):
