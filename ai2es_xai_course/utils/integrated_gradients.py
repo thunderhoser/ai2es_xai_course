@@ -66,8 +66,11 @@ def _compute_gradients(model_object, predictor_matrix_interp, target_class):
         else:
             probabilities = probability_array[:, target_class]
 
+    probability_tensor = tensorflow.constant(
+        probabilities, dtype=tensorflow.float64
+    )
     gradient_tensor = tape_object.gradient(
-        probabilities, predictor_tensor_interp
+        probability_tensor, predictor_tensor_interp
     )
     return K.eval(gradient_tensor)
 
