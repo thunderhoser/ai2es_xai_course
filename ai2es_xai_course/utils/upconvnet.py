@@ -2,6 +2,7 @@
 
 import copy
 import numpy
+import tensorflow
 import keras.models
 from ai2es_xai_course.utils import cnn, utils, image_utils, image_normalization
 
@@ -207,9 +208,13 @@ def setup_upconvnet(
         inputs=input_layer_object, outputs=layer_object
     )
 
+    def ssim_loss(y_true, y_pred):
+        return tensorflow.reduce_mean(
+            tensorflow.image.ssim(y_true, y_pred, 2.0)
+        )
+
     model_object.compile(
-        loss=keras.losses.mean_squared_error,
-        optimizer=keras.optimizers.Adam()
+        loss=ssim_loss, optimizer=keras.optimizers.Adam()
     )
 
     model_object.summary()
